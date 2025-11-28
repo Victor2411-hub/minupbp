@@ -1,0 +1,84 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+
+  /* Glass Colors - Adjusted for Light Mode */
+  /* We use darker blacks with low opacity for glass effect on light background, 
+     or white with high opacity if we want "frosted glass" look on colored elements.
+     Since the background is white, "glass" usually means a slight off-white or 
+     very subtle gray with blur and shadow. */
+  --glass-100: rgba(255, 255, 255, 0.4);
+  --glass-200: rgba(255, 255, 255, 0.6);
+  --glass-300: rgba(255, 255, 255, 0.7);
+  --glass-400: rgba(255, 255, 255, 0.8);
+  --glass-500: rgba(255, 255, 255, 0.9);
+
+  /* For borders/shadows to be visible on white */
+  --glass-border: rgba(0, 0, 0, 0.05);
+  --glass-shadow: rgba(0, 0, 0, 0.05);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  --color-glass-100: var(--glass-100);
+  --color-glass-200: var(--glass-200);
+  --color-glass-300: var(--glass-300);
+  --color-glass-400: var(--glass-400);
+  --color-glass-500: var(--glass-500);
+
+  --color-glass-border: var(--glass-border);
+
+  --animate-fade-in: fade-in 0.5s ease-out;
+  --animate-slide-in: slide-in 0.5s ease-out;
+
+  @keyframes fade-in {
+    0% {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes slide-in {
+    0% {
+      transform: translateX(-100%);
+    }
+
+    100% {
+      transform: translateX(0);
+    }
+  }
+}
+
+body {
+  background-color: #f8fafc;
+  /* Slate-50 */
+  /* Noise texture */
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.03'/%3E%3C/svg%3E");
+  color: var(--foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  min-height: 100vh;
+}
+
+/* Glass Utilities - Refined for Light Theme */
+.glass-panel {
+  @apply bg-white/60 backdrop-blur-xl border border-black/5 shadow-xl;
+}
+
+.glass-button {
+  @apply bg-white/80 hover:bg-white backdrop-blur-md border border-black/5 shadow-sm transition-all duration-300 active:scale-95 text-gray-800;
+}
+
+.glass-input {
+  @apply bg-white/50 backdrop-blur-sm border border-black/10 focus:border-black/20 focus:ring-2 focus:ring-black/5 outline-none transition-all text-gray-900 placeholder:text-gray-400;
+}

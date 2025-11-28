@@ -1,0 +1,134 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Event {
+  id        String   @id @default(cuid())
+  name      String
+  date      DateTime
+  status    String   @default("active") // active, archived
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  committees Committee[]
+}
+
+model Committee {
+  id        String   @id @default(cuid())
+  name      String
+  eventId   String
+  event     Event    @relation(fields: [eventId], references: [id])
+  
+  chairAssignments ChairAssignment[]
+  delegates        Delegate[]
+  sheetAssignments CommitteeSheet[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// MANY-TO-MANY: Chair ↔ Committee (with position)
+model ChairAssignment {
+  id          String    @id @default(cuid())
+  chairId     String
+  committeeId String
+  position    String    // e.g., "President", "Vice President", "Moderator"
+  
+  chair       Chair     @relation(fields: [chairId], references: [id])
+  committee   Committee @relation(fields: [committeeId], references: [id])
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@unique([chairId, committeeId])
+}
+
+model Chair {
+  id          String            @id @default(cuid())
+  name        String
+  username    String            @unique
+  password    String
+  active      Boolean           @default(true)
+  assignments ChairAssignment[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Country {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  code      String     // ISO code for flags
+  flagUrl   String?    // URL to flag image
+  active    Boolean    @default(true)
+  delegates Delegate[]
+}
+
+model Delegate {
+  id          String    @id @default(cuid())
+  name        String
+  email       String?
+  countryId   String
+  country     Country   @relation(fields: [countryId], references: [id])
+  committeeId String
+  committee   Committee @relation(fields: [committeeId], references: [id])
+  active      Boolean   @default(true)
+  
+  scores      Score[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Evaluation Sheets are now REUSABLE (not tied to single committee)
+model EvaluationSheet {
+  id               String           @id @default(cuid())
+  name             String
+  description      String?
+  criteria         Criterion[]
+  committeeSheets  CommitteeSheet[] // M:N with Committee
+  
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+// MANY-TO-MANY: EvaluationSheet ↔ Committee
+model CommitteeSheet {
+  id          String          @id @default(cuid())
+  committeeId String
+  sheetId     String
+  
+  committee   Committee       @relation(fields: [committeeId], references: [id])
+  sheet       EvaluationSheet @relation(fields: [sheetId], references: [id])
+  
+  createdAt   DateTime @default(now())
+  
+  @@unique([committeeId, sheetId])
+}
+
+model Criterion {
+  id        String          @id @default(cuid())
+  name      String
+  maxScore  Int
+  sheetId   String
+  sheet     EvaluationSheet @relation(fields: [sheetId], references: [id])
+  scores    Score[]
+}
+
+model Score {
+  id          String    @id @default(cuid())
+  value       Int
+  delegateId  String
+  delegate    Delegate  @relation(fields: [delegateId], references: [id])
+  criterionId String
+  criterion   Criterion @relation(fields: [criterionId], references: [id])
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([delegateId, criterionId])
+}
