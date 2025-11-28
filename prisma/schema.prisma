@@ -7,128 +7,177 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Event {
-  id        String   @id @default(cuid())
-  name      String
-  date      DateTime
-  status    String   @default("active") // active, archived
+model Evento {
+  id        Int      @id @default(autoincrement())
+  nombre    String
+  fecha     DateTime
+  estado    String   @default("activo") // activo, archivado
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  committees Committee[]
+  comites   Comite[]
 }
 
-model Committee {
-  id        String   @id @default(cuid())
-  name      String
-  eventId   String
-  event     Event    @relation(fields: [eventId], references: [id])
+model Comite {
+  id        Int      @id @default(autoincrement())
+  nombre    String
+  eventoId  Int
+  evento    Evento   @relation(fields: [eventoId], references: [id])
   
-  chairAssignments ChairAssignment[]
-  delegates        Delegate[]
-  sheetAssignments CommitteeSheet[]
+  asignacionesMesa AsignacionMesa[]
+  delegados        Delegado[]
+  asignacionesHoja AsignacionHoja[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
-// MANY-TO-MANY: Chair ↔ Committee (with position)
-model ChairAssignment {
-  id          String    @id @default(cuid())
-  chairId     String
-  committeeId String
-  position    String    // e.g., "President", "Vice President", "Moderator"
+// MANY-TO-MANY: UsuarioMesa ↔ Comite (with position)
+model AsignacionMesa {
+  id            Int         @id @default(autoincrement())
+  usuarioMesaId Int
+  comiteId      Int
+  cargo         String      // e.g., "Presidente", "Vicepresidente", "Moderador"
   
-  chair       Chair     @relation(fields: [chairId], references: [id])
-  committee   Committee @relation(fields: [committeeId], references: [id])
+  usuarioMesa   UsuarioMesa @relation(fields: [usuarioMesaId], references: [id])
+  comite        Comite      @relation(fields: [comiteId], references: [id])
   
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
   
-  @@unique([chairId, committeeId])
+  @@unique([usuarioMesaId, comiteId])
 }
 
-model Chair {
-  id          String            @id @default(cuid())
-  name        String
-  username    String            @unique
-  password    String
-  active      Boolean           @default(true)
-  assignments ChairAssignment[]
+model UsuarioMesa {
+  id               Int              @id @default(autoincrement())
+  nombre           String
+  usuario          String           @unique
+  contrasena       String
+  activo           Boolean          @default(true)
+  asignaciones     AsignacionMesa[]
+  usuariosPermisos UsuarioPermiso[]
   
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 }
 
-model Country {
-  id        String     @id @default(cuid())
-  name      String     @unique
-  code      String     // ISO code for flags
-  flagUrl   String?    // URL to flag image
-  active    Boolean    @default(true)
-  delegates Delegate[]
+enum TipoPermiso {
+  PAGINA
+  ACCION
 }
 
-model Delegate {
-  id          String    @id @default(cuid())
-  name        String
-  email       String?
-  countryId   String
-  country     Country   @relation(fields: [countryId], references: [id])
-  committeeId String
-  committee   Committee @relation(fields: [committeeId], references: [id])
-  active      Boolean   @default(true)
+model Permiso {
+  id               Int              @id @default(autoincrement())
+  clave            String           @unique
+  nombre           String
+  descripcion      String?
+  tipo             TipoPermiso
+  usuariosPermisos UsuarioPermiso[]
   
-  scores      Score[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+}
+
+model UsuarioPermiso {
+  id            Int         @id @default(autoincrement())
+  usuarioMesaId Int
+  permisoId     Int
+  
+  usuarioMesa   UsuarioMesa @relation(fields: [usuarioMesaId], references: [id], onDelete: Cascade)
+  permiso       Permiso     @relation(fields: [permisoId], references: [id], onDelete: Cascade)
+  
+  createdAt     DateTime    @default(now())
+  
+  @@unique([usuarioMesaId, permisoId])
+}
+
+model Pais {
+  id         Int        @id @default(autoincrement())
+  nombre     String     @unique
+  codigo     String     // ISO code for flags
+  banderaUrl String?    // URL to flag image
+  activo     Boolean    @default(true)
+  delegados  Delegado[]
+}
+
+model Delegado {
+  id        Int      @id @default(autoincrement())
+  nombre    String
+  email     String?
+  paisId    Int
+  pais      Pais     @relation(fields: [paisId], references: [id])
+  comiteId  Int
+  comite    Comite   @relation(fields: [comiteId], references: [id])
+  activo    Boolean  @default(true)
+  
+  puntajes        Puntaje[]
+  
+  // New fields
+  telefono        String?
+  edad            Int?
+  grado           String?          // 1ro, 2do, 3ro, 4to, 5to, 6to
+  centroEducativoId Int?
+  centroEducativo CentroEducativo? @relation(fields: [centroEducativoId], references: [id])
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model CentroEducativo {
+  id        Int        @id @default(autoincrement())
+  nombre    String     @unique
+  activo    Boolean    @default(true)
+  delegados Delegado[]
+  
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
 }
 
 // Evaluation Sheets are now REUSABLE (not tied to single committee)
-model EvaluationSheet {
-  id               String           @id @default(cuid())
-  name             String
-  description      String?
-  criteria         Criterion[]
-  committeeSheets  CommitteeSheet[] // M:N with Committee
+model HojaEvaluacion {
+  id               Int              @id @default(autoincrement())
+  nombre           String
+  descripcion      String?
+  criterios        Criterio[]
+  asignacionesHoja AsignacionHoja[] // M:N with Committee
   
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 }
 
-// MANY-TO-MANY: EvaluationSheet ↔ Committee
-model CommitteeSheet {
-  id          String          @id @default(cuid())
-  committeeId String
-  sheetId     String
+// MANY-TO-MANY: HojaEvaluacion ↔ Comite
+model AsignacionHoja {
+  id       Int            @id @default(autoincrement())
+  comiteId Int
+  hojaId   Int
   
-  committee   Committee       @relation(fields: [committeeId], references: [id])
-  sheet       EvaluationSheet @relation(fields: [sheetId], references: [id])
+  comite   Comite         @relation(fields: [comiteId], references: [id])
+  hoja     HojaEvaluacion @relation(fields: [hojaId], references: [id])
   
-  createdAt   DateTime @default(now())
+  createdAt DateTime      @default(now())
   
-  @@unique([committeeId, sheetId])
+  @@unique([comiteId, hojaId])
 }
 
-model Criterion {
-  id        String          @id @default(cuid())
-  name      String
-  maxScore  Int
-  sheetId   String
-  sheet     EvaluationSheet @relation(fields: [sheetId], references: [id])
-  scores    Score[]
+model Criterio {
+  id         Int            @id @default(autoincrement())
+  nombre     String
+  maxPuntaje Int
+  hojaId     Int
+  hoja       HojaEvaluacion @relation(fields: [hojaId], references: [id])
+  puntajes   Puntaje[]
 }
 
-model Score {
-  id          String    @id @default(cuid())
-  value       Int
-  delegateId  String
-  delegate    Delegate  @relation(fields: [delegateId], references: [id])
-  criterionId String
-  criterion   Criterion @relation(fields: [criterionId], references: [id])
+model Puntaje {
+  id         Int      @id @default(autoincrement())
+  valor      Int
+  delegadoId Int
+  delegado   Delegado @relation(fields: [delegadoId], references: [id])
+  criterioId Int
+  criterio   Criterio @relation(fields: [criterioId], references: [id])
   
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  @@unique([delegateId, criterionId])
+  @@unique([delegadoId, criterioId])
 }

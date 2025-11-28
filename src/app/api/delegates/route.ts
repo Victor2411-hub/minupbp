@@ -7,21 +7,51 @@ export async function GET(request: Request) {
 
     try {
         const where: any = {};
-        if (committeeId) where.committeeId = committeeId;
+        if (committeeId) where.comiteId = parseInt(committeeId);
 
-        const delegates = await prisma.delegate.findMany({
+        const delegados = await prisma.delegado.findMany({
             where,
             include: {
-                country: true,
-                committee: {
+                pais: true,
+                comite: {
                     include: {
-                        event: true
+                        evento: true
                     }
-                }
+                },
+                centroEducativo: true
             },
-            orderBy: { country: { name: "asc" } },
+            orderBy: { pais: { nombre: "asc" } },
         });
-        return NextResponse.json(delegates);
+
+        // Map to English for frontend
+        const mapped = delegados.map(d => ({
+            id: d.id,
+            name: d.nombre,
+            email: d.email,
+            phone: d.telefono,
+            age: d.edad,
+            grade: d.grado,
+            countryId: d.paisId,
+            committeeId: d.comiteId,
+            schoolId: d.centroEducativoId,
+            country: {
+                id: d.pais.id,
+                name: d.pais.nombre,
+                code: d.pais.codigo,
+                flagUrl: d.pais.banderaUrl
+            },
+            committee: {
+                id: d.comite.id,
+                name: d.comite.nombre,
+                eventId: d.comite.eventoId
+            },
+            school: d.centroEducativo ? {
+                id: d.centroEducativo.id,
+                name: d.centroEducativo.nombre
+            } : null
+        }));
+
+        return NextResponse.json(mapped);
     } catch (error) {
         console.error("Failed to fetch delegates:", error);
         return NextResponse.json([], { status: 500 });
@@ -32,16 +62,20 @@ export async function POST(request: Request) {
     try {
         const body = await request.json();
 
-        const delegate = await prisma.delegate.create({
+        const delegado = await prisma.delegado.create({
             data: {
-                name: body.name,
+                nombre: body.name,
                 email: body.email || null,
-                countryId: body.countryId,
-                committeeId: body.committeeId,
+                telefono: body.phone || null,
+                edad: body.age ? parseInt(body.age) : null,
+                grado: body.grade || null,
+                paisId: parseInt(body.countryId),
+                comiteId: parseInt(body.committeeId),
+                centroEducativoId: body.schoolId ? parseInt(body.schoolId) : null,
             },
-            include: { country: true, committee: true },
+            include: { pais: true, comite: true, centroEducativo: true },
         });
-        return NextResponse.json(delegate);
+        return NextResponse.json(delegado);
     } catch (error) {
         console.error("Failed to create delegate:", error);
         return NextResponse.json({ error: "Failed to create delegate" }, { status: 500 });
@@ -53,12 +87,22 @@ export async function PATCH(request: Request) {
         const body = await request.json();
         const { id, ...data } = body;
 
-        const delegate = await prisma.delegate.update({
-            where: { id },
-            data,
-            include: { country: true, committee: true },
+        const updateData: any = {};
+        if (data.name) updateData.nombre = data.name;
+        if (data.email !== undefined) updateData.email = data.email;
+        if (data.phone !== undefined) updateData.telefono = data.phone;
+        if (data.age) updateData.edad = parseInt(data.age);
+        if (data.grade !== undefined) updateData.grado = data.grade;
+        if (data.countryId) updateData.paisId = parseInt(data.countryId);
+        if (data.committeeId) updateData.comiteId = parseInt(data.committeeId);
+        if (data.schoolId !== undefined) updateData.centroEducativoId = data.schoolId ? parseInt(data.schoolId) : null;
+
+        const delegado = await prisma.delegado.update({
+            where: { id: parseInt(id) },
+            data: updateData,
+            include: { pais: true, comite: true, centroEducativo: true },
         });
-        return NextResponse.json(delegate);
+        return NextResponse.json(delegado);
     } catch (error) {
         console.error("Failed to update delegate:", error);
         return NextResponse.json({ error: "Failed to update delegate" }, { status: 500 });
@@ -74,8 +118,8 @@ export async function DELETE(request: Request) {
             return NextResponse.json({ error: "ID is required" }, { status: 400 });
         }
 
-        await prisma.delegate.delete({
-            where: { id },
+        await prisma.delegado.delete({
+            where: { id: parseInt(id) },
         });
         return NextResponse.json({ success: true });
     } catch (error) {

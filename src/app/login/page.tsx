@@ -3,56 +3,109 @@
 import { GlassButton } from "@/components/ui/GlassButton";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { GlassInput } from "@/components/ui/GlassInput";
-import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { Lock } from "lucide-react";
 
 export default function LoginPage() {
-    const [password, setPassword] = useState("");
+    const [usuario, setUsuario] = useState("");
+    const [contrasena, setContrasena] = useState("");
     const [error, setError] = useState("");
-    const router = useRouter();
+    const [loading, setLoading] = useState(false);
 
-    const handleLogin = (e: React.FormEvent) => {
+    const router = useRouter();
+    const searchParams = useSearchParams();
+    const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
+
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (password === "mun2025") {
-            router.push("/dashboard");
+        setError("");
+        setLoading(true);
+
+        const result = await signIn("credentials", {
+            usuario,
+            contrasena,
+            redirect: false,
+        });
+
+        setLoading(false);
+
+        if (result?.error) {
+            setError("Usuario o contraseña incorrectos");
         } else {
-            setError("Invalid Access Code");
+            router.push(callbackUrl);
+            router.refresh();
         }
     };
 
     return (
-        <div className="flex min-h-screen items-center justify-center p-4">
-            <GlassCard className="w-full max-w-md p-8">
-                <div className="mb-8 text-center">
-                    <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-blue-500/10">
-                        <Lock className="h-8 w-8 text-blue-600" />
-                    </div>
-                    <h1 className="mb-2 text-2xl font-bold text-gray-900">Chair Access</h1>
-                    <p className="text-gray-500">Enter the access code to continue</p>
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 p-4">
+            <GlassCard className="w-full max-w-md p-8 space-y-6">
+                {/* Logo/Header */}
+                <div className="text-center space-y-2">
+                    <h1 className="text-3xl font-bold text-gray-900">
+                        MUN Platform
+                    </h1>
+                    <p className="text-sm text-gray-600">
+                        Sistema de Gestión de Modelo de Naciones Unidas
+                    </p>
                 </div>
 
-                <form onSubmit={handleLogin} className="space-y-6">
-                    <div className="space-y-2">
+                {/* Login Form */}
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Usuario
+                        </label>
+                        <GlassInput
+                            type="text"
+                            value={usuario}
+                            onChange={(e) => setUsuario(e.target.value)}
+                            placeholder="Ingresa tu usuario"
+                            required
+                            disabled={loading}
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Contraseña
+                        </label>
                         <GlassInput
                             type="password"
-                            placeholder="Access Code"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            className="text-center text-lg tracking-widest"
+                            value={contrasena}
+                            onChange={(e) => setContrasena(e.target.value)}
+                            placeholder="Ingresa tu contraseña"
+                            required
+                            disabled={loading}
                         />
                     </div>
 
                     {error && (
-                        <p className="text-center text-sm text-red-500 animate-pulse">
-                            {error}
-                        </p>
+                        <div className="p-3 rounded-lg bg-red-50 border border-red-200">
+                            <p className="text-sm text-red-600">{error}</p>
+                        </div>
                     )}
 
-                    <GlassButton type="submit" className="w-full justify-center">
-                        Enter Dashboard
+                    <GlassButton
+                        type="submit"
+                        disabled={loading}
+                        className="w-full justify-center bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+                    >
+                        {loading ? "Ingresando..." : "Ingresar"}
                     </GlassButton>
                 </form>
+
+                {/* Help Link */}
+                <div className="text-center">
+                    <button
+                        type="button"
+                        className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
+                        onClick={() => alert("Contacta al administrador del sistema")}
+                    >
+                        ¿Necesitas ayuda?
+                    </button>
+                </div>
             </GlassCard>
         </div>
     );

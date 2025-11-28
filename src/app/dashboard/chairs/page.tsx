@@ -7,17 +7,17 @@ import { Plus, Trash2, UserPlus, Edit } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface Chair {
-    id: string;
+    id: number;
     name: string;
     username: string;
     assignments: Assignment[];
 }
 
 interface Assignment {
-    id: string;
+    id: number;
     position: string;
     committee: {
-        id: string;
+        id: number;
         name: string;
         event: {
             name: string;
@@ -29,6 +29,10 @@ export default function ChairsPage() {
     const [chairs, setChairs] = useState<Chair[]>([]);
     const [newChair, setNewChair] = useState({ name: "", username: "", password: "" });
     const [loading, setLoading] = useState(false);
+
+    const [editingChair, setEditingChair] = useState<Chair | null>(null);
+    const [editForm, setEditForm] = useState({ name: "", username: "", password: "" });
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
     const fetchChairs = async () => {
         const res = await fetch("/api/chairs");
@@ -46,6 +50,7 @@ export default function ChairsPage() {
 
         await fetch("/api/chairs", {
             method: "POST",
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify(newChair),
         });
 
@@ -54,7 +59,39 @@ export default function ChairsPage() {
         setLoading(false);
     };
 
-    const handleDelete = async (id: string) => {
+    const handleEditClick = (chair: Chair) => {
+        setEditingChair(chair);
+        setEditForm({ name: chair.name, username: chair.username, password: "" });
+        setIsEditModalOpen(true);
+    };
+
+    const handleUpdate = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingChair) return;
+        setLoading(true);
+
+        const body: any = {
+            name: editForm.name,
+            username: editForm.username,
+        };
+
+        if (editForm.password) {
+            body.password = editForm.password;
+        }
+
+        await fetch(`/api/chairs?id=${editingChair.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+        });
+
+        setIsEditModalOpen(false);
+        setEditingChair(null);
+        fetchChairs();
+        setLoading(false);
+    };
+
+    const handleDelete = async (id: number) => {
         if (!confirm("¿Eliminar esta mesa directiva?")) return;
 
         await fetch(`/api/chairs?id=${id}`, { method: "DELETE" });
@@ -108,6 +145,7 @@ export default function ChairsPage() {
                                     onClick={async () => {
                                         await fetch(`/api/chairs?id=${chair.id}`, {
                                             method: "PATCH",
+                                            headers: { "Content-Type": "application/json" },
                                             body: JSON.stringify({ active: !(chair as any).active }),
                                         });
                                         fetchChairs();
@@ -126,6 +164,13 @@ export default function ChairsPage() {
                                     )}
                                 </button>
                                 <button
+                                    onClick={() => handleEditClick(chair)}
+                                    className="rounded-full p-2 text-blue-600 hover:bg-blue-50"
+                                    title="Editar"
+                                >
+                                    <Edit className="h-5 w-5" />
+                                </button>
+                                <button
                                     onClick={() => handleDelete(chair.id)}
                                     className="rounded-full p-2 text-gray-400 hover:bg-red-50 hover:text-red-500"
                                     title="Eliminar"
@@ -137,10 +182,10 @@ export default function ChairsPage() {
 
                         <div className="mt-4 space-y-2">
                             <p className="text-xs font-medium uppercase text-gray-500">Asignaciones:</p>
-                            {chair.assignments.length === 0 ? (
+                            {chair.assignments?.length === 0 ? (
                                 <p className="text-sm text-gray-400">Sin asignaciones</p>
                             ) : (
-                                chair.assignments.map((assignment) => (
+                                chair.assignments?.map((assignment) => (
                                     <div
                                         key={assignment.id}
                                         className="rounded-lg border border-gray-100 bg-white/50 p-3 text-sm"
@@ -158,6 +203,47 @@ export default function ChairsPage() {
                     </GlassCard>
                 ))}
             </div>
+
+            {/* Edit Modal */}
+            {isEditModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                    <div className="relative w-full max-w-md rounded-2xl border border-white/20 bg-white/30 p-6 shadow-xl backdrop-blur-xl">
+                        <h2 className="mb-4 text-xl font-bold text-gray-900">Editar Mesa</h2>
+                        <form onSubmit={handleUpdate} className="space-y-4">
+                            <GlassInput
+                                placeholder="Nombre completo"
+                                value={editForm.name}
+                                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                                required
+                            />
+                            <GlassInput
+                                placeholder="Usuario"
+                                value={editForm.username}
+                                onChange={(e) => setEditForm({ ...editForm, username: e.target.value })}
+                                required
+                            />
+                            <GlassInput
+                                type="password"
+                                placeholder="Nueva Contraseña (opcional)"
+                                value={editForm.password}
+                                onChange={(e) => setEditForm({ ...editForm, password: e.target.value })}
+                            />
+                            <div className="flex justify-end gap-3 pt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsEditModalOpen(false)}
+                                    className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                                >
+                                    Cancelar
+                                </button>
+                                <GlassButton type="submit" disabled={loading} className="bg-blue-600 text-white">
+                                    Guardar Cambios
+                                </GlassButton>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

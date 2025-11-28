@@ -7,75 +7,76 @@ export async function GET(request: Request) {
 
     try {
         if (committeeId) {
-            // Get sheet assigned to this committee
-            const assignment = await prisma.committeeSheet.findFirst({
-                where: { committeeId },
+            // Get sheet assigned to committee
+            const assignment = await prisma.asignacionHoja.findFirst({
+                where: { comiteId: parseInt(committeeId) },
                 include: {
-                    sheet: {
-                        include: { criteria: true }
+                    hoja: {
+                        include: { criterios: true }
                     }
                 }
             });
-            return NextResponse.json(assignment?.sheet || null);
+
+            if (!assignment) return NextResponse.json(null);
+
+            const h = assignment.hoja;
+            return NextResponse.json({
+                id: h.id,
+                name: h.nombre,
+                description: h.descripcion,
+                criteria: h.criterios.map(c => ({
+                    id: c.id,
+                    name: c.nombre,
+                    maxScore: c.maxPuntaje,
+                    sheetId: c.hojaId
+                }))
+            });
         } else {
             // Get all sheets
-            const sheets = await prisma.evaluationSheet.findMany({
-                include: {
-                    criteria: true,
-                    _count: {
-                        select: { committeeSheets: true }
-                    }
-                },
-                orderBy: { createdAt: "desc" },
+            const hojas = await prisma.hojaEvaluacion.findMany({
+                include: { criterios: true }
             });
-            return NextResponse.json(sheets);
+
+            const mapped = hojas.map(h => ({
+                id: h.id,
+                name: h.nombre,
+                description: h.descripcion,
+                criteria: h.criterios.map(c => ({
+                    id: c.id,
+                    name: c.nombre,
+                    maxScore: c.maxPuntaje,
+                    sheetId: c.hojaId
+                }))
+            }));
+            return NextResponse.json(mapped);
         }
     } catch (error) {
         console.error("Failed to fetch sheets:", error);
-        return NextResponse.json(null, { status: 500 });
+        return NextResponse.json([], { status: 500 });
     }
 }
 
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { name, description, criteria } = body;
+        // body: { name, description, criteria: [{ name, maxScore }] }
 
-        const sheet = await prisma.evaluationSheet.create({
+        const hoja = await prisma.hojaEvaluacion.create({
             data: {
-                name,
-                description: description || null,
-                criteria: {
-                    create: criteria.map((c: any) => ({
-                        name: c.name,
-                        maxScore: parseInt(c.maxScore),
-                    })),
-                },
+                nombre: body.name,
+                descripcion: body.description,
+                criterios: {
+                    create: body.criteria.map((c: any) => ({
+                        nombre: c.name,
+                        maxPuntaje: parseInt(c.maxScore)
+                    }))
+                }
             },
-            include: { criteria: true },
+            include: { criterios: true }
         });
-        return NextResponse.json(sheet);
+        return NextResponse.json(hoja);
     } catch (error) {
         console.error("Failed to create sheet:", error);
         return NextResponse.json({ error: "Failed to create sheet" }, { status: 500 });
-    }
-}
-
-export async function DELETE(request: Request) {
-    try {
-        const { searchParams } = new URL(request.url);
-        const id = searchParams.get("id");
-
-        if (!id) {
-            return NextResponse.json({ error: "ID is required" }, { status: 400 });
-        }
-
-        await prisma.evaluationSheet.delete({
-            where: { id },
-        });
-        return NextResponse.json({ success: true });
-    } catch (error) {
-        console.error("Failed to delete sheet:", error);
-        return NextResponse.json({ error: "Failed to delete sheet" }, { status: 500 });
     }
 }

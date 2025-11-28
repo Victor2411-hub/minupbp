@@ -1,23 +1,21 @@
 import { prisma } from "@/lib/db";
 import { NextResponse } from "next/server";
+import bcrypt from "bcryptjs";
 
 export async function GET() {
     try {
-        const chairs = await prisma.chair.findMany({
-            include: {
-                assignments: {
-                    include: {
-                        committee: {
-                            include: {
-                                event: true
-                            }
-                        }
-                    }
-                }
-            },
-            orderBy: { name: "asc" },
+        const usuarios = await prisma.usuarioMesa.findMany({
+            orderBy: { nombre: "asc" },
         });
-        return NextResponse.json(chairs);
+
+        // Map to English
+        const mapped = usuarios.map(u => ({
+            id: u.id,
+            name: u.nombre,
+            username: u.usuario,
+            active: u.activo
+        }));
+        return NextResponse.json(mapped);
     } catch (error) {
         console.error("Failed to fetch chairs:", error);
         return NextResponse.json([], { status: 500 });
@@ -27,30 +25,49 @@ export async function GET() {
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const chair = await prisma.chair.create({
+
+        // Hash password before storing
+        const hashedPassword = await bcrypt.hash(body.password, 10);
+
+        const usuario = await prisma.usuarioMesa.create({
             data: {
-                name: body.name,
-                username: body.username,
-                password: body.password, // TODO: Hash in production!
+                nombre: body.name,
+                usuario: body.username,
+                contrasena: hashedPassword,
             },
         });
-        return NextResponse.json(chair);
+        return NextResponse.json(usuario);
     } catch (error) {
-        console.error("Failed to create chair:", error);
         return NextResponse.json({ error: "Failed to create chair" }, { status: 500 });
     }
 }
 
 export async function PATCH(request: Request) {
     try {
-        const body = await request.json();
-        const { id, ...data } = body;
+        const { searchParams } = new URL(request.url);
+        const id = searchParams.get("id");
 
-        const chair = await prisma.chair.update({
-            where: { id },
-            data,
+        if (!id) {
+            return NextResponse.json({ error: "ID required" }, { status: 400 });
+        }
+
+        const body = await request.json();
+        const updateData: any = {};
+
+        if (body.name) updateData.nombre = body.name;
+        if (body.username) updateData.usuario = body.username;
+        if (body.active !== undefined) updateData.activo = body.active;
+
+        if (body.password) {
+            updateData.contrasena = await bcrypt.hash(body.password, 10);
+        }
+
+        const usuario = await prisma.usuarioMesa.update({
+            where: { id: parseInt(id) },
+            data: updateData,
         });
-        return NextResponse.json(chair);
+
+        return NextResponse.json(usuario);
     } catch (error) {
         console.error("Failed to update chair:", error);
         return NextResponse.json({ error: "Failed to update chair" }, { status: 500 });
@@ -63,15 +80,15 @@ export async function DELETE(request: Request) {
         const id = searchParams.get("id");
 
         if (!id) {
-            return NextResponse.json({ error: "ID is required" }, { status: 400 });
+            return NextResponse.json({ error: "ID required" }, { status: 400 });
         }
 
-        await prisma.chair.delete({
-            where: { id },
+        await prisma.usuarioMesa.delete({
+            where: { id: parseInt(id) },
         });
+
         return NextResponse.json({ success: true });
     } catch (error) {
-        console.error("Failed to delete chair:", error);
         return NextResponse.json({ error: "Failed to delete chair" }, { status: 500 });
     }
 }

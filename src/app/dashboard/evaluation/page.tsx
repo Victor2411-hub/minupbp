@@ -9,13 +9,13 @@ import { Plus, Save, Trash2, Download, FileText } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface Criterion {
-    id: string;
+    id: number;
     name: string;
     maxScore: number;
 }
 
 interface EvaluationSheet {
-    id: string;
+    id: number;
     name: string;
     description: string | null;
     criteria: Criterion[];
@@ -26,8 +26,8 @@ export default function EvaluationPage() {
     const [sheetName, setSheetName] = useState("");
     const [sheetDescription, setSheetDescription] = useState("");
     const [criteria, setCriteria] = useState<Criterion[]>([
-        { id: "1", name: "Public Speaking", maxScore: 10 },
-        { id: "2", name: "Diplomacy", maxScore: 10 },
+        { id: 1, name: "Public Speaking", maxScore: 10 },
+        { id: 2, name: "Diplomacy", maxScore: 10 },
     ]);
 
     const fetchSheets = async () => {
@@ -43,15 +43,15 @@ export default function EvaluationPage() {
     const addCriterion = () => {
         setCriteria([
             ...criteria,
-            { id: Math.random().toString(), name: "", maxScore: 10 },
+            { id: Date.now(), name: "", maxScore: 10 },
         ]);
     };
 
-    const removeCriterion = (id: string) => {
+    const removeCriterion = (id: number) => {
         setCriteria(criteria.filter((c) => c.id !== id));
     };
 
-    const updateCriterion = (id: string, field: keyof Criterion, value: string | number) => {
+    const updateCriterion = (id: number, field: keyof Criterion, value: string | number) => {
         setCriteria(
             criteria.map((c) => (c.id === id ? { ...c, [field]: value } : c))
         );
@@ -76,7 +76,7 @@ export default function EvaluationPage() {
                 alert("¡Hoja de Evaluación Guardada!");
                 setSheetName("");
                 setSheetDescription("");
-                setCriteria([{ id: "1", name: "Public Speaking", maxScore: 10 }]);
+                setCriteria([{ id: 1, name: "Public Speaking", maxScore: 10 }]);
                 fetchSheets();
             } else {
                 alert("Error al guardar la hoja.");
@@ -86,7 +86,7 @@ export default function EvaluationPage() {
         }
     };
 
-    const handleDelete = async (id: string) => {
+    const handleDelete = async (id: number) => {
         if (!confirm("¿Eliminar esta hoja?")) return;
         await fetch(`/api/sheets?id=${id}`, { method: "DELETE" });
         fetchSheets();

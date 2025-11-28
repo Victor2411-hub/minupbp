@@ -17,9 +17,9 @@ export async function GET(request: Request) {
     }
 
     try {
-        const sheet = await prisma.evaluationSheet.findUnique({
-            where: { id },
-            include: { criteria: true },
+        const sheet = await prisma.hojaEvaluacion.findUnique({
+            where: { id: parseInt(id) },
+            include: { criterios: true },
         });
         if (!sheet) {
             return NextResponse.json({ error: "Sheet not found" }, { status: 404 });
@@ -28,31 +28,31 @@ export async function GET(request: Request) {
         if (format === "excel") {
             // Create a workbook and worksheet
             const workbook = new ExcelJS.Workbook();
-            const ws = workbook.addWorksheet(sheet.name);
+            const ws = workbook.addWorksheet(sheet.nombre);
             ws.columns = [
                 { header: "Criterio", key: "name", width: 30 },
                 { header: "Máximo", key: "maxScore", width: 10 },
             ];
-            sheet.criteria.forEach((c) => ws.addRow({ name: c.name, maxScore: c.maxScore }));
+            sheet.criterios.forEach((c) => ws.addRow({ name: c.nombre, maxScore: c.maxPuntaje }));
 
             const buffer = await workbook.xlsx.writeBuffer();
             const headers = new Headers();
             headers.set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-            headers.set("Content-Disposition", `attachment; filename="${sheet.name}.xlsx"`);
+            headers.set("Content-Disposition", `attachment; filename="${sheet.nombre}.xlsx"`);
             return new Response(buffer, { status: 200, headers });
         } else if (format === "pdf") {
             const doc = new PDFDocument();
             const stream = new PassThrough();
             doc.pipe(stream);
-            doc.fontSize(20).text(sheet.name, { align: "center" });
+            doc.fontSize(20).text(sheet.nombre, { align: "center" });
             doc.moveDown();
-            sheet.criteria.forEach((c, idx) => {
-                doc.fontSize(12).text(`${idx + 1}. ${c.name} (Máx: ${c.maxScore})`);
+            sheet.criterios.forEach((c, idx) => {
+                doc.fontSize(12).text(`${idx + 1}. ${c.nombre} (Máx: ${c.maxPuntaje})`);
             });
             doc.end();
             const headers = new Headers();
             headers.set("Content-Type", "application/pdf");
-            headers.set("Content-Disposition", `attachment; filename="${sheet.name}.pdf"`);
+            headers.set("Content-Disposition", `attachment; filename="${sheet.nombre}.pdf"`);
             // Cast stream to any to satisfy Response BodyInit type
             return new Response(stream as any, { status: 200, headers });
         } else {

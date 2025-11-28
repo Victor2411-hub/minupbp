@@ -1,63 +1,59 @@
 import { prisma } from "@/lib/db";
 import { NextResponse } from "next/server";
 
+export async function GET(request: Request) {
+    const { searchParams } = new URL(request.url);
+    const committeeId = searchParams.get("committeeId");
+
+    if (!committeeId) {
+        return NextResponse.json({ error: "Committee ID is required" }, { status: 400 });
+    }
+
+    try {
+        const puntajes = await prisma.puntaje.findMany({
+            where: {
+                delegado: { comiteId: parseInt(committeeId) }
+            }
+        });
+
+        // Map to English
+        const mapped = puntajes.map(p => ({
+            id: p.id,
+            value: p.valor,
+            delegateId: p.delegadoId,
+            criterionId: p.criterioId
+        }));
+
+        return NextResponse.json(mapped);
+    } catch (error) {
+        console.error("Failed to fetch grading:", error);
+        return NextResponse.json([], { status: 500 });
+    }
+}
+
 export async function POST(request: Request) {
     try {
         const body = await request.json();
         const { delegateId, criterionId, value } = body;
 
-        const score = await prisma.score.upsert({
+        const puntaje = await prisma.puntaje.upsert({
             where: {
-                delegateId_criterionId: {
-                    delegateId,
-                    criterionId,
-                },
+                delegadoId_criterioId: {
+                    delegadoId: parseInt(delegateId),
+                    criterioId: parseInt(criterionId)
+                }
             },
-            update: { value: parseInt(value) },
+            update: { valor: value },
             create: {
-                delegateId,
-                criterionId,
-                value: parseInt(value),
-            },
+                delegadoId: parseInt(delegateId),
+                criterioId: parseInt(criterionId),
+                valor: value
+            }
         });
 
-        return NextResponse.json(score);
+        return NextResponse.json(puntaje);
     } catch (error) {
+        console.error("Failed to save score:", error);
         return NextResponse.json({ error: "Failed to save score" }, { status: 500 });
-    }
-}
-
-export async function GET(request: Request) {
-    const { searchParams } = new URL(request.url);
-    const committeeId = searchParams.get("committeeId");
-    const delegateId = searchParams.get("delegateId");
-
-    try {
-        if (committeeId) {
-            // Get all scores for all delegates in this committee
-            const scores = await prisma.score.findMany({
-                where: {
-                    delegate: {
-                        committeeId: committeeId,
-                    },
-                },
-                include: {
-                    delegate: true,
-                    criterion: true,
-                },
-            });
-            return NextResponse.json(scores);
-        } else if (delegateId) {
-            // Get scores for a specific delegate
-            const scores = await prisma.score.findMany({
-                where: { delegateId },
-            });
-            return NextResponse.json(scores);
-        } else {
-            return NextResponse.json([]);
-        }
-    } catch (error) {
-        console.error("Failed to fetch scores:", error);
-        return NextResponse.json({ error: "Failed to fetch scores" }, { status: 500 });
     }
 }

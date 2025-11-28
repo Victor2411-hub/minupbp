@@ -10,26 +10,30 @@ export async function GET(request: Request) {
     }
 
     try {
-        const committees = await prisma.committee.findMany({
-            where: { eventId },
+        const comites = await prisma.comite.findMany({
+            where: { eventoId: parseInt(eventId) },
             include: {
-                chairAssignments: {
+                asignacionesMesa: {
                     include: {
-                        chair: true
+                        usuarioMesa: true
                     }
                 },
-                sheetAssignments: {
+                asignacionesHoja: {
                     include: {
-                        sheet: true
+                        hoja: true
                     }
                 },
                 _count: {
-                    select: { delegates: true }
+                    select: { delegados: true }
                 }
             },
-            orderBy: { name: "asc" },
+            orderBy: { nombre: "asc" },
         });
-        return NextResponse.json(committees);
+
+        // Map back to English structure for frontend compatibility (temporarily)
+        // Or better, update frontend to expect Spanish. 
+        // I will return Spanish structure and update Frontend.
+        return NextResponse.json(comites);
     } catch (error) {
         console.error("Failed to fetch committees:", error);
         return NextResponse.json([], { status: 500 });
@@ -40,16 +44,35 @@ export async function POST(request: Request) {
     try {
         const body = await request.json();
 
-        const committee = await prisma.committee.create({
+        const comite = await prisma.comite.create({
             data: {
-                name: body.name,
-                eventId: body.eventId,
+                nombre: body.name,
+                eventoId: parseInt(body.eventId),
             },
         });
-        return NextResponse.json(committee);
+        return NextResponse.json(comite);
     } catch (error) {
         console.error("Failed to create committee:", error);
         return NextResponse.json({ error: "Failed to create committee" }, { status: 500 });
+    }
+}
+
+export async function PATCH(request: Request) {
+    try {
+        const body = await request.json();
+        const { id, ...data } = body;
+
+        const updateData: any = {};
+        if (data.name) updateData.nombre = data.name;
+
+        const comite = await prisma.comite.update({
+            where: { id: parseInt(id) },
+            data: updateData,
+        });
+        return NextResponse.json(comite);
+    } catch (error) {
+        console.error("Failed to update committee:", error);
+        return NextResponse.json({ error: "Failed to update committee" }, { status: 500 });
     }
 }
 
@@ -62,8 +85,8 @@ export async function DELETE(request: Request) {
             return NextResponse.json({ error: "ID is required" }, { status: 400 });
         }
 
-        await prisma.committee.delete({
-            where: { id },
+        await prisma.comite.delete({
+            where: { id: parseInt(id) },
         });
         return NextResponse.json({ success: true });
     } catch (error) {
