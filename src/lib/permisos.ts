@@ -17,6 +17,7 @@ export function puedeVerPagina(permisos: string[], ruta: string): boolean {
         '/dashboard/events': 'pagina_eventos',
         '/dashboard/setup': 'pagina_configuracion',
         '/dashboard/countries': 'pagina_paises',
+        '/dashboard/schools': 'pagina_centros',
         '/dashboard/delegates': 'pagina_delegados',
         '/dashboard/grading': 'pagina_calificaciones',
         '/dashboard/evaluation': 'pagina_evaluacion',
@@ -40,6 +41,8 @@ export function puedeEditar(permisos: string[], recurso: string): boolean {
         'eventos': 'editar_eventos',
         'comites': 'editar_comites',
         'paises': 'editar_paises',
+        'centros': 'editar_centros',
+        'editar_centros': 'editar_centros', // Allow direct permission name
         'delegados': 'editar_delegados',
         'calificaciones': 'editar_calificaciones',
         'hojas': 'editar_hojas',
@@ -47,6 +50,10 @@ export function puedeEditar(permisos: string[], recurso: string): boolean {
 
     const permisoRequerido = mapaEdicion[recurso];
     if (!permisoRequerido) {
+        // If resource is not mapped, check if it's a direct permission string
+        if (permisos.includes(recurso) || permisos.includes('acceso_total')) {
+            return true;
+        }
         return false;
     }
 
@@ -69,6 +76,7 @@ export function obtenerPaginasPermitidas(permisos: string[]): string[] {
             '/dashboard/events',
             '/dashboard/setup',
             '/dashboard/countries',
+            '/dashboard/schools',
             '/dashboard/delegates',
             '/dashboard/grading',
             '/dashboard/evaluation',
@@ -81,6 +89,7 @@ export function obtenerPaginasPermitidas(permisos: string[]): string[] {
     if (permisos.includes('pagina_eventos')) paginas.push('/dashboard/events');
     if (permisos.includes('pagina_configuracion')) paginas.push('/dashboard/setup');
     if (permisos.includes('pagina_paises')) paginas.push('/dashboard/countries');
+    if (permisos.includes('pagina_centros')) paginas.push('/dashboard/schools');
     if (permisos.includes('pagina_delegados')) paginas.push('/dashboard/delegates');
     if (permisos.includes('pagina_calificaciones')) paginas.push('/dashboard/grading');
     if (permisos.includes('pagina_evaluacion')) paginas.push('/dashboard/evaluation');

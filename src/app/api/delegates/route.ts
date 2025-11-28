@@ -34,6 +34,8 @@ export async function GET(request: Request) {
             countryId: d.paisId,
             committeeId: d.comiteId,
             schoolId: d.centroEducativoId,
+            participations: d.participaciones,
+            comments: d.comentarios,
             country: {
                 id: d.pais.id,
                 name: d.pais.nombre,
@@ -62,6 +64,36 @@ export async function POST(request: Request) {
     try {
         const body = await request.json();
 
+        // 1. Find or create Participante
+        let participanteId = null;
+
+        // Try to find by email if provided
+        if (body.email) {
+            // @ts-ignore
+            const existingParticipante = await prisma.participante.findUnique({
+                where: { email: body.email },
+            });
+            if (existingParticipante) {
+                participanteId = existingParticipante.id;
+            }
+        }
+
+        // If not found, create new Participante
+        if (!participanteId) {
+            // @ts-ignore
+            const newParticipante = await prisma.participante.create({
+                data: {
+                    nombre: body.name,
+                    email: body.email || null,
+                    telefono: body.phone || null,
+                    grado: body.grade || null,
+                    // fechaNacimiento could be calculated from age if needed, but for now skipping
+                    centroEducativoId: body.schoolId ? parseInt(body.schoolId) : null,
+                },
+            });
+            participanteId = newParticipante.id;
+        }
+
         const delegado = await prisma.delegado.create({
             data: {
                 nombre: body.name,
@@ -72,6 +104,8 @@ export async function POST(request: Request) {
                 paisId: parseInt(body.countryId),
                 comiteId: parseInt(body.committeeId),
                 centroEducativoId: body.schoolId ? parseInt(body.schoolId) : null,
+                // @ts-ignore
+                participanteId: participanteId,
             },
             include: { pais: true, comite: true, centroEducativo: true },
         });
@@ -96,6 +130,8 @@ export async function PATCH(request: Request) {
         if (data.countryId) updateData.paisId = parseInt(data.countryId);
         if (data.committeeId) updateData.comiteId = parseInt(data.committeeId);
         if (data.schoolId !== undefined) updateData.centroEducativoId = data.schoolId ? parseInt(data.schoolId) : null;
+        if (data.participations !== undefined) updateData.participaciones = parseInt(data.participations);
+        if (data.comments !== undefined) updateData.comentarios = data.comments;
 
         const delegado = await prisma.delegado.update({
             where: { id: parseInt(id) },

@@ -8,12 +8,15 @@ import {
     useReactTable,
 } from "@tanstack/react-table";
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { useSession } from "next-auth/react";
 import ScoreInput from "./ScoreInput";
 import { Download } from "lucide-react";
 
 interface Delegate {
     id: number;
     name: string;
+    participations: number;
+    comments: string | null;
     country: {
         name: string;
         flagUrl: string | null;
@@ -27,6 +30,7 @@ interface Criterion {
 }
 
 export default function GradingPage() {
+    const { data: session } = useSession(); // Get session for user ID
     const [events, setEvents] = useState<any[]>([]);
     const [selectedEventId, setSelectedEventId] = useState("");
 
@@ -36,12 +40,20 @@ export default function GradingPage() {
     const [delegates, setDelegates] = useState<Delegate[]>([]);
     const [criteria, setCriteria] = useState<Criterion[]>([]);
     const [scores, setScores] = useState<Record<string, number>>({});
+    const [presence, setPresence] = useState<Record<string, { userId: string }>>({}); // Presence map
     const [loading, setLoading] = useState(false);
+    const [focusedCell, setFocusedCell] = useState<{ d: number, c: number } | null>(null); // Track focused cell
 
     // Debounce state
     const [pendingSaves, setPendingSaves] = useState<Record<string, boolean>>({});
+    const pendingSavesRef = useRef<Record<string, boolean>>({}); // Ref to access latest pending state in interval
     const saveTimeouts = useRef<Record<string, NodeJS.Timeout>>({});
     const [lastSaved, setLastSaved] = useState<Date | null>(null);
+
+    // Sync ref with state
+    useEffect(() => {
+        pendingSavesRef.current = pendingSaves;
+    }, [pendingSaves]);
 
     // 1. Load Events
     useEffect(() => {
@@ -67,37 +79,86 @@ export default function GradingPage() {
     useEffect(() => {
         if (!selectedCommitteeId) return;
 
-        setLoading(true);
-        Promise.all([
-            fetch(`/api/delegates?committeeId=${selectedCommitteeId}`).then((r) => r.json()),
-            fetch(`/api/sheets?committeeId=${selectedCommitteeId}`).then((r) => r.json()),
-            fetch(`/api/grading?committeeId=${selectedCommitteeId}`).then((r) => r.json()),
-        ])
-            .then(([delegatesData, sheetData, gradingData]) => {
-                setDelegates(Array.isArray(delegatesData) ? delegatesData : []);
+        let isMounted = true;
+
+        const fetchData = async (isInitial = false) => {
+            if (isInitial) setLoading(true);
+            try {
+                const [delegatesData, sheetData, gradingResponse] = await Promise.all([
+                    fetch(`/api/delegates?committeeId=${selectedCommitteeId}`).then((r) => r.json()),
+                    fetch(`/api/sheets?committeeId=${selectedCommitteeId}`).then((r) => r.json()),
+                    fetch(`/api/grading?committeeId=${selectedCommitteeId}`).then((r) => r.json()),
+                ]);
+
+                if (!isMounted) return;
+
+                // Only update delegates if changed to prevent table re-render/focus loss
+                if (JSON.stringify(delegatesData) !== JSON.stringify(delegates)) {
+                    setDelegates(Array.isArray(delegatesData) ? delegatesData : []);
+                }
 
                 // Handle sheet data structure
                 const crit = sheetData && sheetData.criteria ? sheetData.criteria : [];
-                setCriteria(crit);
+                // Only update criteria if changed
+                if (JSON.stringify(crit) !== JSON.stringify(criteria)) {
+                    setCriteria(crit);
+                }
+
+                // Handle grading response (now object with scores and presence)
+                const gradingData = gradingResponse.scores || (Array.isArray(gradingResponse) ? gradingResponse : []);
+                const presenceData = gradingResponse.presence || [];
 
                 // Map scores: "delegateId-criterionId" -> value
-                const map: Record<string, number> = {};
+                const serverScores: Record<string, number> = {};
                 if (Array.isArray(gradingData)) {
                     gradingData.forEach((g: any) => {
-                        map[`${g.delegateId}-${g.criterionId}`] = g.value;
+                        serverScores[`${g.delegateId}-${g.criterionId}`] = g.value;
                     });
                 }
-                setScores(map);
-                setLoading(false);
-            })
-            .catch((e) => {
+
+                // Map presence: "delegateId-criterionId" -> { userId }
+                const presenceMap: Record<string, { userId: string }> = {};
+                if (Array.isArray(presenceData)) {
+                    presenceData.forEach((p: any) => {
+                        presenceMap[`${p.delegateId}-${p.criterionId}`] = { userId: p.userId };
+                    });
+                }
+                setPresence(presenceMap);
+
+                // Merge with local state, preserving pending saves
+                setScores((prevScores) => {
+                    const newScores = { ...serverScores };
+                    // If we have pending saves, keep the local (optimistic) value
+                    const currentPending = pendingSavesRef.current;
+                    Object.keys(currentPending).forEach((key) => {
+                        if (currentPending[key] && prevScores[key] !== undefined) {
+                            newScores[key] = prevScores[key];
+                        }
+                    });
+                    return newScores;
+                });
+
+                if (isInitial) setLoading(false);
+            } catch (e) {
                 console.error("Failed to load committee data", e);
-                setDelegates([]);
-                setCriteria([]);
-                setScores({});
-                setLoading(false);
-            });
-    }, [selectedCommitteeId]);
+                if (isMounted && isInitial) {
+                    setDelegates([]);
+                    setCriteria([]);
+                    setScores({});
+                    setLoading(false);
+                }
+            }
+        };
+
+        fetchData(true);
+
+        const interval = setInterval(() => fetchData(false), 3000); // Reverted to 3 seconds
+
+        return () => {
+            isMounted = false;
+            clearInterval(interval);
+        };
+    }, [selectedCommitteeId]); // Only re-run if committee changes
 
     const handleScoreChange = useCallback(async (delegateId: number, criterionId: number, value: string) => {
         const num = parseInt(value) || 0;
@@ -135,6 +196,44 @@ export default function GradingPage() {
         }, 1000);
     }, []);
 
+    const handleFocus = useCallback(async (delegateId: number, criterionId: number) => {
+        if (!session?.user?.id) return;
+        try {
+            await fetch("/api/grading/presence", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    delegateId,
+                    criterionId,
+                    userId: session.user.id
+                }),
+            });
+        } catch (e) {
+            console.error("Failed to send heartbeat", e);
+        }
+    }, [session?.user?.id]);
+
+    const handleUpdateDelegate = useCallback(async (delegateId: number, field: "participations" | "comments", value: any) => {
+        // Optimistic update
+        setDelegates(prev => prev.map(d => {
+            if (d.id === delegateId) {
+                return { ...d, [field]: value };
+            }
+            return d;
+        }));
+
+        try {
+            await fetch("/api/delegates", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id: delegateId, [field]: value }),
+            });
+        } catch (e) {
+            console.error("Failed to update delegate", e);
+            // Revert? For now, just log.
+        }
+    }, []);
+
     const columns = useMemo<ColumnDef<Delegate>[]>(() => {
         if (!criteria.length) return [];
 
@@ -159,6 +258,47 @@ export default function GradingPage() {
                 header: "Delegado",
                 accessorKey: "name",
             },
+            {
+                header: "Part.",
+                accessorKey: "participations",
+                cell: ({ row, table }: any) => {
+                    const count = row.original.participations || 0;
+                    const update = table.options.meta?.handleUpdateDelegate;
+                    return (
+                        <div className="flex items-center gap-1">
+                            <button
+                                onClick={() => update(row.original.id, "participations", Math.max(0, count - 1))}
+                                className="w-6 h-6 flex items-center justify-center rounded bg-red-100 text-red-600 hover:bg-red-200"
+                            >-</button>
+                            <span className="w-6 text-center font-medium">{count}</span>
+                            <button
+                                onClick={() => update(row.original.id, "participations", count + 1)}
+                                className="w-6 h-6 flex items-center justify-center rounded bg-green-100 text-green-600 hover:bg-green-200"
+                            >+</button>
+                        </div>
+                    );
+                }
+            },
+            {
+                header: "Comentarios",
+                accessorKey: "comments",
+                cell: ({ row, table }: any) => {
+                    const comment = row.original.comments || "";
+                    const update = table.options.meta?.handleUpdateDelegate;
+                    return (
+                        <textarea
+                            defaultValue={comment}
+                            onBlur={(e) => {
+                                if (e.target.value !== comment) {
+                                    update(row.original.id, "comments", e.target.value);
+                                }
+                            }}
+                            className="w-32 h-8 text-xs p-1 rounded border border-gray-200 resize-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                            placeholder="..."
+                        />
+                    );
+                }
+            },
         ];
 
         const critCols = criteria.map((c) => ({
@@ -169,17 +309,36 @@ export default function GradingPage() {
                 // Access scores and handler from table meta to avoid re-renders
                 const currentScores = table.options.meta?.scores || {};
                 const onScoreChange = table.options.meta?.handleScoreChange;
+                const onFocus = table.options.meta?.handleFocus;
+                const setFocused = table.options.meta?.setFocusedCell;
+                const focused = table.options.meta?.focusedCell;
                 const pending = table.options.meta?.pendingSaves || {};
+                const presenceMap = table.options.meta?.presence || {};
+                const currentSession = table.options.meta?.session;
 
                 const val = currentScores[`${delegateId}-${c.id}`] ?? "";
                 const isPending = pending[`${delegateId}-${c.id}`];
+                const cellPresence = presenceMap[`${delegateId}-${c.id}`];
+
+                // Only show presence if it's NOT me
+                const showPresence = cellPresence && cellPresence.userId !== currentSession?.user?.id ? cellPresence : undefined;
+
+                // Check if this cell should be focused
+                const shouldFocus = focused?.d === delegateId && focused?.c === c.id;
 
                 return (
                     <ScoreInput
                         value={val}
                         max={c.maxScore}
                         onChange={(val) => onScoreChange(delegateId, c.id, val)}
+                        onFocus={() => {
+                            setFocused({ d: delegateId, c: c.id });
+                            onFocus(delegateId, c.id);
+                        }}
+                        onBlur={() => setFocused(null)}
                         isPending={isPending}
+                        presence={showPresence}
+                        autoFocus={shouldFocus}
                     />
                 );
             },
@@ -205,10 +364,17 @@ export default function GradingPage() {
         data: delegates,
         columns,
         getCoreRowModel: getCoreRowModel(),
+        getRowId: (row) => row.id.toString(), // Ensure stable row IDs
         meta: {
             scores,
             handleScoreChange,
+            handleFocus,
+            setFocusedCell,
+            focusedCell,
+            handleUpdateDelegate,
             pendingSaves,
+            presence,
+            session
         } as any,
     });
 

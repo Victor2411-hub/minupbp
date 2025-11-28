@@ -162,6 +162,40 @@ export default function DelegatesPage() {
         (d.school?.name || "").toLowerCase().includes(searchTerm.toLowerCase())
     );
 
+    const [searching, setSearching] = useState(false);
+    const [participantResults, setParticipantResults] = useState<any[]>([]);
+    const [selectedParticipant, setSelectedParticipant] = useState<any>(null);
+
+    const searchParticipants = async (query: string) => {
+        if (query.length < 2) {
+            setParticipantResults([]);
+            return;
+        }
+        setSearching(true);
+        try {
+            const res = await fetch(`/api/participants/search?q=${encodeURIComponent(query)}`);
+            const data = await res.json();
+            setParticipantResults(data);
+        } catch (error) {
+            console.error("Error searching participants:", error);
+        } finally {
+            setSearching(false);
+        }
+    };
+
+    const handleSelectParticipant = (participant: any) => {
+        setSelectedParticipant(participant);
+        setFormData({
+            ...formData,
+            name: participant.nombre,
+            email: participant.email || "",
+            phone: participant.telefono || "",
+            grade: participant.grado || "",
+            schoolId: participant.centroEducativoId?.toString() || "",
+        });
+        setParticipantResults([]);
+    };
+
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
@@ -172,6 +206,7 @@ export default function DelegatesPage() {
                     onClick={() => {
                         setEditingDelegate(null);
                         setFormData(initialFormState);
+                        setSelectedParticipant(null);
                         setIsModalOpen(true);
                     }}
                     className="bg-blue-600 text-white px-4 py-2 rounded-xl hover:bg-blue-700 transition-colors flex items-center gap-2"
@@ -251,6 +286,55 @@ export default function DelegatesPage() {
                 title={editingDelegate ? "Editar Delegado" : "Registrar Nuevo Delegado"}
             >
                 <form onSubmit={handleSubmit} className="space-y-4">
+                    {!editingDelegate && (
+                        <div className="mb-6 p-4 bg-blue-50 rounded-xl border border-blue-100">
+                            <label className="block text-sm font-medium text-blue-900 mb-2">
+                                Buscar Participante Existente
+                            </label>
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-blue-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Escribe el nombre para buscar..."
+                                    className="w-full pl-9 pr-4 py-2 rounded-lg border border-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                    onChange={(e) => searchParticipants(e.target.value)}
+                                />
+                                {participantResults.length > 0 && (
+                                    <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-100 z-10 max-h-48 overflow-y-auto">
+                                        {participantResults.map((p) => (
+                                            <button
+                                                key={p.id}
+                                                type="button"
+                                                onClick={() => handleSelectParticipant(p)}
+                                                className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm"
+                                            >
+                                                <div className="font-medium text-gray-900">{p.nombre}</div>
+                                                <div className="text-xs text-gray-500">
+                                                    {p.email} • {p.centroEducativo?.nombre || "Sin centro"}
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                            {selectedParticipant && (
+                                <div className="mt-2 text-xs text-blue-600 flex items-center gap-1">
+                                    <span className="font-semibold">Seleccionado:</span> {selectedParticipant.nombre}
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setSelectedParticipant(null);
+                                            setFormData(initialFormState);
+                                        }}
+                                        className="ml-2 hover:text-blue-800"
+                                    >
+                                        <X className="h-3 w-3" />
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="md:col-span-2">
                             <label className="block text-sm font-medium text-gray-700 mb-1">Nombre Completo</label>
@@ -259,6 +343,7 @@ export default function DelegatesPage() {
                                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                                 required
                                 placeholder="Nombre del delegado"
+                                disabled={!!selectedParticipant}
                             />
                         </div>
 
@@ -269,6 +354,7 @@ export default function DelegatesPage() {
                                 value={formData.email}
                                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                                 placeholder="correo@ejemplo.com"
+                                disabled={!!selectedParticipant}
                             />
                         </div>
 
@@ -279,6 +365,7 @@ export default function DelegatesPage() {
                                 value={formData.phone}
                                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                                 placeholder="809-555-5555"
+                                disabled={!!selectedParticipant}
                             />
                         </div>
 
@@ -298,6 +385,7 @@ export default function DelegatesPage() {
                                 className="w-full rounded-xl border border-gray-200 bg-white/50 p-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                                 value={formData.grade}
                                 onChange={(e) => setFormData({ ...formData, grade: e.target.value })}
+                                disabled={!!selectedParticipant}
                             >
                                 <option value="">-- Seleccionar --</option>
                                 <option value="1ro Secundaria">1ro Secundaria</option>
@@ -315,6 +403,7 @@ export default function DelegatesPage() {
                                 className="w-full rounded-xl border border-gray-200 bg-white/50 p-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                                 value={formData.schoolId}
                                 onChange={(e) => setFormData({ ...formData, schoolId: e.target.value })}
+                                disabled={!!selectedParticipant}
                             >
                                 <option value="">-- Seleccionar Centro --</option>
                                 {schools.map((s) => (

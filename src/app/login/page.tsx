@@ -5,9 +5,9 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { GlassInput } from "@/components/ui/GlassInput";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useState, Suspense } from "react";
 
-export default function LoginPage() {
+function LoginForm() {
     const [usuario, setUsuario] = useState("");
     const [contrasena, setContrasena] = useState("");
     const [error, setError] = useState("");
@@ -108,5 +108,13 @@ export default function LoginPage() {
                 </div>
             </GlassCard>
         </div>
+    );
+}
+
+export default function LoginPage() {
+    return (
+        <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Cargando...</div>}>
+            <LoginForm />
+        </Suspense>
     );
 }

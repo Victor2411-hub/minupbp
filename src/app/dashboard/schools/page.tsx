@@ -68,6 +68,7 @@ export default function SchoolsPage() {
             setIsModalOpen(false);
             setEditingSchool(null);
             setFormData({ nombre: "", activo: true });
+            alert(editingSchool ? "Centro actualizado correctamente" : "Centro creado correctamente");
         } catch (error) {
             console.error("Error saving school:", error);
             alert("Error al guardar el centro educativo");
@@ -90,6 +91,7 @@ export default function SchoolsPage() {
             }
 
             await fetchSchools();
+            alert("Centro educativo eliminado correctamente");
         } catch (error: any) {
             console.error("Error deleting school:", error);
             alert(error.message || "Error al eliminar el centro educativo");
@@ -179,8 +181,8 @@ export default function SchoolsPage() {
                                         </td>
                                         <td className="py-4 px-4 text-center">
                                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${school.activo
-                                                    ? "bg-green-100 text-green-800"
-                                                    : "bg-red-100 text-red-800"
+                                                ? "bg-green-100 text-green-800"
+                                                : "bg-red-100 text-red-800"
                                                 }`}>
                                                 {school.activo ? "Activo" : "Inactivo"}
                                             </span>

@@ -10,21 +10,39 @@ export async function GET(request: Request) {
     }
 
     try {
-        const puntajes = await prisma.puntaje.findMany({
-            where: {
-                delegado: { comiteId: parseInt(committeeId) }
-            }
-        });
+        const fiveSecondsAgo = new Date(Date.now() - 5000);
+
+        // @ts-ignore
+        const [puntajes, presence] = await Promise.all([
+            prisma.puntaje.findMany({
+                where: {
+                    delegado: { comiteId: parseInt(committeeId) }
+                }
+            }),
+            // @ts-ignore
+            prisma.gradingPresence.findMany({
+                where: {
+                    delegadoId: { in: (await prisma.delegado.findMany({ where: { comiteId: parseInt(committeeId) }, select: { id: true } })).map(d => d.id) },
+                    updatedAt: { gte: fiveSecondsAgo }
+                }
+            })
+        ]);
 
         // Map to English
-        const mapped = puntajes.map(p => ({
+        const mappedScores = puntajes.map(p => ({
             id: p.id,
             value: p.valor,
             delegateId: p.delegadoId,
             criterionId: p.criterioId
         }));
 
-        return NextResponse.json(mapped);
+        const mappedPresence = presence.map((p: any) => ({
+            delegateId: p.delegadoId,
+            criterionId: p.criterioId,
+            userId: p.userId
+        }));
+
+        return NextResponse.json({ scores: mappedScores, presence: mappedPresence });
     } catch (error) {
         console.error("Failed to fetch grading:", error);
         return NextResponse.json([], { status: 500 });

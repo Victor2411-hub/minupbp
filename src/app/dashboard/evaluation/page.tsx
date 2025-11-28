@@ -38,6 +38,8 @@ export default function EvaluationPage() {
 
     useEffect(() => {
         fetchSheets();
+        const interval = setInterval(fetchSheets, 3000);
+        return () => clearInterval(interval);
     }, []);
 
     const addCriterion = () => {
@@ -197,24 +199,26 @@ export default function EvaluationPage() {
                                             ))}
                                         </div>
                                         <div className="mt-2 flex gap-2">
-                                            <GlassButton
-                                                as="a"
+                                            <motion.a
+                                                whileHover={{ scale: 1.05 }}
+                                                whileTap={{ scale: 0.95 }}
                                                 href={`/api/sheets/export?id=${sheet.id}&format=excel`}
-                                                className="bg-green-600 text-white"
+                                                className="glass-button rounded-lg px-4 py-2 font-medium transition-colors bg-green-600 text-white inline-flex items-center"
                                                 target="_blank"
                                                 download
                                             >
                                                 <Download className="h-5 w-5 mr-1" /> Excel
-                                            </GlassButton>
-                                            <GlassButton
-                                                as="a"
+                                            </motion.a>
+                                            <motion.a
+                                                whileHover={{ scale: 1.05 }}
+                                                whileTap={{ scale: 0.95 }}
                                                 href={`/api/sheets/export?id=${sheet.id}&format=pdf`}
-                                                className="bg-red-600 text-white"
+                                                className="glass-button rounded-lg px-4 py-2 font-medium transition-colors bg-red-600 text-white inline-flex items-center"
                                                 target="_blank"
                                                 download
                                             >
                                                 <FileText className="h-5 w-5 mr-1" /> PDF
-                                            </GlassButton>
+                                            </motion.a>
                                         </div>
                                     </div>
                                     <button

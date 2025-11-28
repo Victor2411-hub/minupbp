@@ -112,13 +112,37 @@ model Delegado {
   
   puntajes        Puntaje[]
   
-  // New fields
+  // Restored fields
   telefono        String?
   edad            Int?
   grado           String?          // 1ro, 2do, 3ro, 4to, 5to, 6to
   centroEducativoId Int?
   centroEducativo CentroEducativo? @relation(fields: [centroEducativoId], references: [id])
+  
+  participanteId  Int?
+  participante    Participante?    @relation(fields: [participanteId], references: [id])
 
+  // New fields for grading
+  participaciones Int      @default(0)
+  comentarios     String?  @db.Text
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Participante {
+  id              Int      @id @default(autoincrement())
+  nombre          String
+  email           String?  @unique
+  telefono        String?
+  fechaNacimiento DateTime?
+  grado           String?
+  
+  centroEducativoId Int?
+  centroEducativo CentroEducativo? @relation(fields: [centroEducativoId], references: [id])
+  
+  delegaciones    Delegado[]
+  
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
@@ -128,6 +152,7 @@ model CentroEducativo {
   nombre    String     @unique
   activo    Boolean    @default(true)
   delegados Delegado[]
+  participantes Participante[]
   
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
@@ -180,4 +205,20 @@ model Puntaje {
   updatedAt  DateTime @updatedAt
 
   @@unique([delegadoId, criterioId])
+}
+
+model GradingPresence {
+  id         Int      @id @default(autoincrement())
+  delegadoId Int
+  criterioId Int
+  userId     String   // ID or name of the user editing
+  updatedAt  DateTime @updatedAt
+
+  @@unique([delegadoId, criterioId]) // Only one person can edit a cell at a time? Or just track last editor?
+  // Let's allow multiple presence records but we'll upsert by user+cell if we want to track multiple people on same cell.
+  // For simplicity and "locking" UI, let's assume we just want to know "who is here".
+  // If we want to show "User A is editing", we upsert by (delegadoId, criterioId).
+  // Actually, if User A and User B are both there, we might want to know both?
+  // But the requirement is "if someone is editing".
+  // Let's stick to one active editor per cell for simplicity of the "lock" visualization.
 }
